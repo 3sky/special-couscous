@@ -1,0 +1,17 @@
+name: Building my awesome docker image
+run-name: ${{ github.actor }} on GitHub Actions 🚀
+on: [push]
+jobs:
+  Build-FastAPI-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: ./ecs-api/
+          push: false
+          tags: 3sky/fastapi:${{ github.sha }}
