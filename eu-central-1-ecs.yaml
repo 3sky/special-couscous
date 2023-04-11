@@ -7,7 +7,15 @@ Parameters:
 
   ServiceName:
     Type: String
-    Default: example-service
+    Default: fastapi
+
+  OrgName:
+    Type: String
+    Default: 3sky
+
+  RepoName:
+    Type: String
+    Default: special-couscous
 
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
@@ -167,6 +175,59 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable
       SubnetId: !Ref PrivateSubnet
 
+  ## CICD and OIDC part
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ServiceName}-repository"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+
+  GitHubOIDC:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ThumbprintList:
+        - f879abce0008e4eb126e0097e46620f5aaae26ad # valid until 2023-11-07 23:59:59
+      ClientIdList:
+        - sts.amazonaws.com
+
+  OIDCRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}GitHubTo${ServiceName}Role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDC
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub "repo:${OrgName}/${RepoName}:*"
+      Path: /
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}GitHubTo${ServiceName}AccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:PutImage"
+                  - "ecr:InitiateLayerUpload"
+                  - "ecr:UploadLayerPart"
+                  - "ecr:CompleteLayerUpload"
+                Resource:
+                  - !GetAtt Repository.Arn
+      Tags:
+        - Key: Env
+          Value: !Ref EnvironmentName
+
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -179,7 +240,6 @@ Resources:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${AWS::StackName}-${EnvironmentName}-task-definition"
-      # awsvpc is required for Fargate
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -370,3 +430,11 @@ Resources:
         ScaleInCooldown: 10
         ScaleOutCooldown: 10
         TargetValue: 50
+
+Outputs:
+  RoleArn:
+    Description: ARN of Access Role
+    Value: !GetAtt OIDCRole.Arn
+  RepositoryUri:
+    Description: Repository URL
+    Value: !GetAtt Repository.RepositoryUri
