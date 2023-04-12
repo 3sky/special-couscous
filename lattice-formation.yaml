@@ -1,0 +1,168 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Run CFn Lattice itself
+
+Resources:
+  EC2TargetGroup:
+    Type: AWS::VpcLattice::TargetGroup
+    Properties:
+      Name: ec2-lattice-tg
+      Type: INSTANCE
+      Config:
+        HealthCheck:
+          Enabled: true
+          Path: "/"
+          Port: 80
+          Protocol: HTTP
+          Matcher:
+            HttpCode: "200"
+        Port: 80
+        Protocol: HTTP
+        ProtocolVersion: HTTP1
+        VpcIdentifier: !ImportValue ec2-vpc
+      Targets:
+        - Id: !ImportValue ec2-instanceid
+          Port: 80
+      # INSTANCE | IP | LAMBDA | ALB
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  ECSTargetGroup:
+    Type: AWS::VpcLattice::TargetGroup
+    Properties:
+      Name: ecs-lattice-tg
+      # INSTANCE | IP | LAMBDA | ALB
+      Type: ALB
+      Config:
+        # HC not supported for ALB
+        #HealthCheck:
+        #  Enabled: true
+        #  Path: "/"
+        #  Port: 80
+        #  Protocol: HTTP
+        #  Matcher:
+        #    HttpCode: "200"
+        Port: 80
+        Protocol: HTTP
+        ProtocolVersion: HTTP1
+        VpcIdentifier: !ImportValue ecs-vpc
+      Targets:
+        - Id: !ImportValue ecs-alb-arn
+          Port: 80
+
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  GeneralListener:
+    Type: AWS::VpcLattice::Listener
+    Properties:
+      Name: ec2-80
+      Port: 80
+      Protocol: HTTP
+      ServiceIdentifier: !Ref Service
+      DefaultAction:
+        Forward:
+          TargetGroups:
+            - TargetGroupIdentifier: !Ref EC2TargetGroup
+              Weight: 10
+            - TargetGroupIdentifier: !Ref ECSTargetGroup
+              Weight: 10
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  ECSGeneralSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: lattice-ecs-too-open-security-group
+      VpcId: !ImportValue ecs-vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !ImportValue ecs-vpc-cidr
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  EC2GeneralSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: lattice-ecs-too-open-security-group
+      VpcId: !ImportValue ec2-vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !ImportValue ec2-vpc-cidr
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  ECSVpcAssocination:
+    Type: AWS::VpcLattice::ServiceNetworkVpcAssociation
+    Properties:
+      SecurityGroupIds: [!Ref ECSGeneralSecurityGroup]
+      ServiceNetworkIdentifier: !Ref LatticeServiceNetwork
+      VpcIdentifier: !ImportValue ecs-vpc
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  EC2VpcAssocination:
+    Type: AWS::VpcLattice::ServiceNetworkVpcAssociation
+    Properties:
+      SecurityGroupIds: [!Ref EC2GeneralSecurityGroup]
+      ServiceNetworkIdentifier: !Ref LatticeServiceNetwork
+      VpcIdentifier: !ImportValue ec2-vpc
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  LatticeServiceNetwork:
+    Type: AWS::VpcLattice::ServiceNetwork
+    Properties:
+      AuthType: NONE
+      Name: awesome-service-network
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  Service:
+    Type: AWS::VpcLattice::Service
+    Properties:
+      AuthType: NONE
+      Name: awesome-service
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+  ServiceNetworkAssocination:
+    Type: AWS::VpcLattice::ServiceNetworkServiceAssociation
+    Properties:
+      ServiceIdentifier: !Ref Service
+      ServiceNetworkIdentifier: !Ref LatticeServiceNetwork
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost

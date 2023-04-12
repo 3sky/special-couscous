@@ -34,8 +34,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-vpc"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -43,8 +45,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-ig"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   NATGateway:
     Type: AWS::EC2::NatGateway
@@ -54,8 +58,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-NATgw"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   EIP:
     DependsOn:
@@ -80,8 +86,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-public-subnet"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   PrivateSubnet:
     Type: AWS::EC2::Subnet
@@ -93,8 +101,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-private-subnet"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -103,8 +113,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-public-rt"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   DefaultPublicRoute:
     Type: AWS::EC2::Route
@@ -127,8 +139,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-private-rt"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   DefaultPrivateRoute:
     Type: AWS::EC2::Route
@@ -153,6 +167,10 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -165,8 +183,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-ec2-sg"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   Role:
     Type: AWS::IAM::Role
@@ -181,8 +201,10 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   SSMProfile:
     Type: AWS::IAM::InstanceProfile
@@ -208,5 +230,24 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-ec2"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
+
+Outputs:
+  InstanceID:
+    Description: Instance ID
+    Value: !Ref Instance
+    Export:
+      Name: "ec2-instanceid"
+  VPCID:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: "ec2-vpc"
+  VPCCIDR:
+    Description: VPC cidr
+    Value: !GetAtt VPC.CidrBlock
+    Export:
+      Name: "ec2-vpc-cidr"

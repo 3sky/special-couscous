@@ -3,10 +3,10 @@ run-name: ${{ github.actor }} on GitHub Actions 🚀
 on: push
 
 env:
-  AWS_REGION: "eu-central-1"
+  AWS_REGION: "us-east-1"
 
 permissions:
-  id-token: write # This is required for requesting the JWT
+  id-token: write
   contents: read
 
 jobs:
@@ -33,3 +33,5 @@ jobs:
         run: |
           docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG ./ecs-api/
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          docker tag $REGISTRY/$REPOSITORY:$IMAGE_TAG $REGISTRY/$REPOSITORY:latest
+          docker push $REGISTRY/$REPOSITORY:latest

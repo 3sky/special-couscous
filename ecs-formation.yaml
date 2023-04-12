@@ -17,6 +17,16 @@ Parameters:
     Type: String
     Default: special-couscous
 
+  ContainerImage:
+    Type: String
+    Default: public.ecr.aws/ecs-sample-image/amazon-ecs-sample:latest
+    # Default: !Sub "${AWS::AccountId}.dkr.ecr.us-east-1.amazonaws.com/fastapi-repository:latest"
+
+  HCPath:
+    Type: String
+    Default: /
+    # Default: /healtz
+
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
@@ -47,8 +57,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-vpc"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -56,8 +68,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-ig"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   NATGateway:
     Type: AWS::EC2::NatGateway
@@ -67,8 +81,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-NATgw"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   EIP:
     DependsOn:
@@ -93,8 +109,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-public-subnet1"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -106,8 +124,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-public-subnet2"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   PrivateSubnet:
     Type: AWS::EC2::Subnet
@@ -119,8 +139,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-private-subnet"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -129,8 +151,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-public-rt"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   DefaultPublicRoute:
     Type: AWS::EC2::Route
@@ -159,8 +183,10 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName}-${EnvironmentName}-private-rt"
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   DefaultPrivateRoute:
     Type: AWS::EC2::Route
@@ -182,6 +208,9 @@ Resources:
       RepositoryName: !Sub "${ServiceName}-repository"
       ImageScanningConfiguration:
         ScanOnPush: true
+      Tags:
+        - Key: Owner
+          Value: kuba
 
   GitHubOIDC:
     Type: AWS::IAM::OIDCProvider
@@ -191,11 +220,16 @@ Resources:
         - f879abce0008e4eb126e0097e46620f5aaae26ad # valid until 2023-11-07 23:59:59
       ClientIdList:
         - sts.amazonaws.com
+      Tags:
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   OIDCRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AWS::StackName}GitHubTo${ServiceName}Role"
+      RoleName: !Sub "${AWS::StackName}-GitHub-to-${ServiceName}-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -204,37 +238,28 @@ Resources:
               Federated: !Ref GitHubOIDC
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
-              StringEquals:
+              ForAnyValue:StringEquals:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub "repo:${OrgName}/${RepoName}:ref:refs/heads/main"
+                  - !Sub "repo:${OrgName}/${RepoName}:ref:refs/heads/dev"
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub "repo:${OrgName}/${RepoName}:*"
-      Path: /
-      Policies:
-        - PolicyName: !Sub "${AWS::StackName}GitHubTo${ServiceName}AccessPolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - "ecr:GetDownloadUrlForLayer"
-                  - "ecr:BatchGetImage"
-                  - "ecr:BatchCheckLayerAvailability"
-                  - "ecr:PutImage"
-                  - "ecr:InitiateLayerUpload"
-                  - "ecr:UploadLayerPart"
-                  - "ecr:CompleteLayerUpload"
-                Resource:
-                  - !GetAtt Repository.Arn
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub "${AWS::StackName}-${EnvironmentName}-cluster"
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -249,7 +274,7 @@ Resources:
       TaskRoleArn: !Ref TaskRole
       ContainerDefinitions:
         - Name: !Ref ServiceName
-          Image: public.ecr.aws/ecs-sample-image/amazon-ecs-sample:latest
+          Image: !Ref ContainerImage
           PortMappings:
             - ContainerPort: 80
           LogConfiguration:
@@ -258,9 +283,18 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: ecs
+          HealthCheck:
+            Command:
+              - "CMD-SHELL"
+              - "curl -f http://localhost:80/ || exit 1"
+            Interval: 5
+            Retries: 2
+            Timeout: 2
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   ExecutionRole:
     Type: AWS::IAM::Role
@@ -275,8 +309,10 @@ Resources:
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   TaskRole:
     Type: AWS::IAM::Role
@@ -290,8 +326,10 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: "sts:AssumeRole"
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   AutoScalingRole:
     Type: AWS::IAM::Role
@@ -306,8 +344,10 @@ Resources:
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole"
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   ContainerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -320,8 +360,10 @@ Resources:
           ToPort: 80
           SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -334,12 +376,15 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
       Tags:
-        - Key: Env
-          Value: !Ref EnvironmentName
+        - Key: Owner
+          Value: kuba
+        - Key: Project
+          Value: blogpost
 
   Service:
     DependsOn:
       - LoadBalancer
+      - Listener
     Type: AWS::ECS::Service
     Properties:
       ServiceName: !Sub "${AWS::StackName}-${EnvironmentName}-service"
@@ -365,7 +410,7 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       HealthCheckIntervalSeconds: 10
-      HealthCheckPath: /
+      HealthCheckPath: !Ref HCPath
       HealthCheckTimeoutSeconds: 5
       UnhealthyThresholdCount: 2
       HealthyThresholdCount: 2
@@ -396,7 +441,7 @@ Resources:
         - Key: idle_timeout.timeout_seconds
           Value: "60"
       Name: !Sub "${AWS::StackName}-${EnvironmentName}-loadbalancer"
-      Scheme: internet-facing
+      Scheme: internal
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
       Subnets:
@@ -438,3 +483,18 @@ Outputs:
   RepositoryUri:
     Description: Repository URL
     Value: !GetAtt Repository.RepositoryUri
+  VPCID:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: "ecs-vpc"
+  ALBArn:
+    Description: ARN of ALB
+    Value: !Ref LoadBalancer
+    Export:
+      Name: "ecs-alb-arn"
+  VPCCIDR:
+    Description: VPC cidr
+    Value: !GetAtt VPC.CidrBlock
+    Export:
+      Name: "ecs-vpc-cidr"
